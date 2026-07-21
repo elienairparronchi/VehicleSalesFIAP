@@ -1,0 +1,10 @@
+**/.git
+**/.github
+**/bin
+**/obj
+**/.vs
+**/.vscode
+**/TestResults
+**/*.user
+**/*.suo
+README.md

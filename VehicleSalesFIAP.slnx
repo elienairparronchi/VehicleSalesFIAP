@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VehicleSalesFIAP.Api/VehicleSalesFIAP.Api.csproj" />
+    <Project Path="src/VehicleSalesFIAP.Application/VehicleSalesFIAP.Application.csproj" />
+    <Project Path="src/VehicleSalesFIAP.Domain/VehicleSalesFIAP.Domain.csproj" />
+    <Project Path="src/VehicleSalesFIAP.Infrastructure/VehicleSalesFIAP.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VehicleSalesFIAP.Tests/VehicleSalesFIAP.Tests.csproj" />
+  </Folder>
+</Solution>
