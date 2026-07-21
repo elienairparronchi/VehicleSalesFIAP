@@ -1,0 +1,98 @@
+{
+  "realm": "vehiclesalesfiap",
+  "enabled": true,
+  "displayName": "Vehicle Sales FIAP",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "vehicle-manager",
+        "description": "Can manage vehicles and view sold vehicles."
+      },
+      {
+        "name": "buyer",
+        "description": "Can buy vehicles."
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "vehiclesalesfiap-api",
+      "name": "VehicleSalesFIAP API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "http://localhost:5000/*",
+        "http://localhost:5056/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5000",
+        "http://localhost:5056",
+        "+"
+      ],
+      "protocolMappers": [
+        {
+          "name": "vehiclesalesfiap-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "vehiclesalesfiap-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "vehicle.manager",
+      "email": "vehicle.manager@example.com",
+      "firstName": "Vehicle",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": [
+        "vehicle-manager"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "VehicleManager123!",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "buyer.user",
+      "email": "buyer.user@example.com",
+      "firstName": "Buyer",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": [
+        "buyer"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Buyer123!",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}
