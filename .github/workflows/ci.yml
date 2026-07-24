@@ -264,3 +264,7 @@ jobs:
               --output tsv
           )"
           printf '%s\n' "$deployment_output"
+          if ! grep -Fq "DEPLOYMENT_SUCCEEDED:${GITHUB_SHA}" <<< "$deployment_output"; then
+            echo "::error::Azure Run Command did not confirm a successful deployment."
+            exit 1
+          fi
