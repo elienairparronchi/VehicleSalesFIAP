@@ -1,0 +1,74 @@
+{
+  "realm": "vehiclesalesfiap",
+  "enabled": true,
+  "displayName": "Vehicle Sales FIAP",
+  "sslRequired": "external",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "passwordPolicy": "length(10) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1)",
+  "roles": {
+    "realm": [
+      {
+        "name": "vehicle-manager",
+        "description": "Can manage vehicles and view sold vehicles."
+      },
+      {
+        "name": "buyer",
+        "description": "Can buy vehicles."
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "buyers",
+      "path": "/buyers",
+      "realmRoles": [
+        "buyer"
+      ]
+    }
+  ],
+  "defaultGroups": [
+    "/buyers"
+  ],
+  "clients": [
+    {
+      "clientId": "vehiclesalesfiap-api",
+      "name": "VehicleSalesFIAP API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "${PUBLIC_URL}/*"
+      ],
+      "webOrigins": [
+        "${PUBLIC_URL}"
+      ],
+      "protocolMappers": [
+        {
+          "name": "vehiclesalesfiap-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "vehiclesalesfiap-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ]
+}

@@ -6,6 +6,8 @@ O sistema permite cadastrar veiculos para venda, editar veiculos disponiveis, li
 
 Repositorio: https://github.com/elienairparronchi/VehicleSalesFIAP
 
+Vídeo: 
+
 ## Requisitos Atendidos
 
 | Requisito | Implementacao |
@@ -407,11 +409,29 @@ Validacoes do pipeline:
 - coleta de cobertura;
 - verificacao bloqueante de pacotes vulneraveis;
 - teste fim-a-fim da stack Docker com cadastro de comprador no Keycloak;
-- build da imagem Docker;
-- publicacao da imagem no GitHub Container Registry quando aplicavel.
+- build das imagens da API e do executor de migrations;
+- publicacao das imagens no GitHub Container Registry quando aplicavel;
+- deploy automatico da revisao aprovada na VM Azure em pushes para `main`.
 
 O projeto tambem possui Dependabot para atualizacoes de NuGet, SDK .NET, GitHub Actions, Dockerfiles e Docker Compose.
 
+## Ambiente De Producao
+
+O arquivo `compose.prod.yml` descreve o ambiente publicado na VM:
+
+- Caddy como unico ponto de entrada nas portas 80 e 443, com HTTPS automatico;
+- API e Keycloak acessiveis pelo mesmo dominio;
+- SQL Server sem porta publica para os dados transacionais;
+- PostgreSQL sem porta publica e dedicado aos usuarios, grupos, roles e clientes do Keycloak;
+- migrations executadas antes da nova API;
+- credenciais geradas e mantidas somente em `/opt/vehiclesalesfiap/.env.production` na VM;
+- imagens imutaveis identificadas pelo SHA completo do commit;
+- verificacao de saude e retorno para a revisao anterior quando o deploy falha.
+
+O Keycloak de producao usa `start`, banco relacional dedicado e o arquivo `infra/keycloak/realm-production.json`. Esse realm permite o cadastro de compradores, atribui a role `buyer` pelo grupo padrao e nao inclui usuarios ou senhas demonstrativos.
+
+O script `infra/deploy/bootstrap-vm.sh` prepara os segredos uma unica vez. O script `infra/deploy/deploy.sh` e executado pelo Azure Run Command depois que todas as etapas anteriores do GitHub Actions passam. A autenticacao entre GitHub e Azure usa OIDC e nao exige senha, chave SSH ou client secret no repositorio.
+
 ## Fluxo De Pull Request
 
-As alteracoes devem sair de uma branch de trabalho e entrar em `main` por Pull Request. O template em `.github/pull_request_template.md` registra validacoes, riscos e impacto da mudanca. A imagem do GHCR so e publicada depois que os testes unitarios, de integracao e o fluxo Docker fim-a-fim passam.
+As alteracoes devem sair de uma branch de trabalho e entrar em `main` por Pull Request. O template em `.github/pull_request_template.md` registra validacoes, riscos e impacto da mudanca. As imagens do GHCR e o deploy na Azure so avancam depois que os testes unitarios, de integracao e o fluxo Docker fim-a-fim passam.
