@@ -112,3 +112,4 @@ fi
 "${compose[@]}" ps --all
 docker image prune -f
 echo "Revision ${revision} deployed successfully at https://${public_host}."
+echo "DEPLOYMENT_SUCCEEDED:${revision}"
