@@ -14,6 +14,7 @@ public static class AuthenticationExtensions
     {
         var section = configuration.GetSection("Authentication");
         var authority = section["Authority"];
+        var metadataAddress = section["MetadataAddress"];
         var audience = section["Audience"];
         var requireHttpsMetadata = section.GetValue("RequireHttpsMetadata", true);
         var validIssuers = section.GetSection("ValidIssuers").Get<string[]>() ?? [];
@@ -33,6 +34,11 @@ public static class AuthenticationExtensions
             .AddJwtBearer(options =>
             {
                 options.Authority = authority;
+                if (!string.IsNullOrWhiteSpace(metadataAddress))
+                {
+                    options.MetadataAddress = metadataAddress;
+                }
+
                 options.Audience = audience;
                 options.RequireHttpsMetadata = requireHttpsMetadata;
                 options.MapInboundClaims = false;

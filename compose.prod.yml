@@ -1,0 +1,182 @@
+name: vehiclesalesfiap-prod
+
+x-api-environment: &api-environment
+  ASPNETCORE_ENVIRONMENT: Production
+  ConnectionStrings__VehicleSales: Server=sqlserver,1433;Database=${SQLSERVER_DATABASE:?SQLSERVER_DATABASE is required};User Id=sa;Password=${SQLSERVER_SA_PASSWORD:?SQLSERVER_SA_PASSWORD is required};TrustServerCertificate=True
+  Authentication__Authority: https://${PUBLIC_HOST:?PUBLIC_HOST is required}/auth/realms/vehiclesalesfiap
+  Authentication__MetadataAddress: http://keycloak:8080/auth/realms/vehiclesalesfiap/.well-known/openid-configuration
+  Authentication__Audience: vehiclesalesfiap-api
+  Authentication__RequireHttpsMetadata: "false"
+  Authentication__ValidIssuers__0: https://${PUBLIC_HOST:?PUBLIC_HOST is required}/auth/realms/vehiclesalesfiap
+  OpenApi__Enabled: "true"
+
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?PUBLIC_HOST is required}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./infra/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - edge
+      - backend
+    mem_limit: 256m
+    restart: unless-stopped
+
+  api:
+    image: ${API_IMAGE:?API_IMAGE is required}:${IMAGE_TAG:?IMAGE_TAG is required}
+    environment:
+      <<: *api-environment
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bash -ec 'exec 3<>/dev/tcp/localhost/8080; printf \"GET /health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3; head -n 1 <&3 | grep -q \" 200 \"'"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    networks:
+      - backend
+    mem_limit: 512m
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  migrations:
+    image: ${API_IMAGE:?API_IMAGE is required}:migrations-${IMAGE_TAG:?IMAGE_TAG is required}
+    environment:
+      <<: *api-environment
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - backend
+    mem_limit: 512m
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-CU26-ubuntu-22.04
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Express
+      MSSQL_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD:?SQLSERVER_SA_PASSWORD is required}
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"${SQLSERVER_SA_PASSWORD:?SQLSERVER_SA_PASSWORD is required}\" -Q \"SELECT 1\" -b -o /dev/null"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 40s
+    networks:
+      - backend
+    mem_limit: 2560m
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  keycloak-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${KEYCLOAK_DB_NAME:?KEYCLOAK_DB_NAME is required}
+      POSTGRES_USER: ${KEYCLOAK_DB_USERNAME:?KEYCLOAK_DB_USERNAME is required}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD is required}
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - backend
+    mem_limit: 512m
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0
+    command: start --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_NAME:?KEYCLOAK_DB_NAME is required}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USERNAME:?KEYCLOAK_DB_USERNAME is required}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD is required}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME:?KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME is required}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD:?KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD is required}
+      KC_HOSTNAME: https://${PUBLIC_HOST:?PUBLIC_HOST is required}/auth
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
+      KC_CACHE: local
+      KC_SERVER_ASYNC_BOOTSTRAP: "false"
+      PUBLIC_URL: https://${PUBLIC_HOST:?PUBLIC_HOST is required}
+      JAVA_OPTS_KC_HEAP: -XX:MaxRAMPercentage=70 -XX:InitialRAMPercentage=30
+    volumes:
+      - ./infra/keycloak/realm-production.json:/opt/keycloak/data/import/vehiclesalesfiap-realm.json:ro
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "{ printf 'HEAD /health/ready HTTP/1.0\\r\\n\\r\\n' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 60s
+    networks:
+      - backend
+    mem_limit: 1536m
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
+  sqlserver_data:
+  keycloak_db_data:
+
+networks:
+  edge:
+  backend:
+    internal: true

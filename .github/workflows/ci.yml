@@ -56,6 +56,24 @@ jobs:
       - name: Verify formatting
         run: dotnet format VehicleSalesFIAP.slnx --verify-no-changes --verbosity minimal --no-restore
 
+      - name: Validate production deployment files
+        shell: bash
+        run: |
+          export PUBLIC_HOST=vehiclesalesfiap.example.com
+          export API_IMAGE=ghcr.io/example/vehiclesalesfiap
+          export IMAGE_TAG=0123456789012345678901234567890123456789
+          export SQLSERVER_DATABASE=VehicleSalesFIAP
+          export SQLSERVER_SA_PASSWORD=validation-only
+          export KEYCLOAK_DB_NAME=keycloak
+          export KEYCLOAK_DB_USERNAME=keycloak
+          export KEYCLOAK_DB_PASSWORD=validation-only
+          export KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME=validation
+          export KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=validation-only
+          docker compose -f compose.prod.yml config --quiet
+          bash -n infra/deploy/bootstrap-vm.sh
+          bash -n infra/deploy/deploy.sh
+          jq empty infra/keycloak/realm-production.json
+
       - name: Build
         run: dotnet build VehicleSalesFIAP.slnx --configuration Release --no-restore
 
@@ -153,9 +171,24 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=sha-
+            type=raw,value=${{ github.sha }}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and optionally push image
+      - name: Extract migrations image metadata
+        id: migrations-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+          tags: |
+            type=ref,event=branch,prefix=migrations-
+            type=ref,event=pr,prefix=migrations-
+            type=semver,pattern={{version}},prefix=migrations-
+            type=semver,pattern={{major}}.{{minor}},prefix=migrations-
+            type=sha,prefix=migrations-sha-
+            type=raw,value=migrations-${{ github.sha }}
+            type=raw,value=migrations-latest,enable={{is_default_branch}}
+
+      - name: Build and optionally push API image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -166,14 +199,68 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build and optionally push migrations image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/migrations/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.migrations-meta.outputs.tags }}
+          labels: ${{ steps.migrations-meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Publish image summary
         run: |
           {
-            echo "### Container image"
+            echo "### Container images"
             echo ""
             echo "Registry: \`${{ env.REGISTRY }}\`"
-            echo "Image: \`${{ env.REGISTRY }}/${{ steps.image.outputs.name }}\`"
+            echo "API: \`${{ env.REGISTRY }}/${{ steps.image.outputs.name }}\`"
+            echo "Migrations: \`${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:migrations-<tag>\`"
             echo ""
-            echo "Tags:"
+            echo "API tags:"
             echo "${{ steps.meta.outputs.tags }}" | sed 's/^/- `/' | sed 's/$/`/'
+            echo ""
+            echo "Migrations tags:"
+            echo "${{ steps.migrations-meta.outputs.tags }}" | sed 's/^/- `/' | sed 's/$/`/'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy to Azure VM
+    runs-on: ubuntu-latest
+    needs: container
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://${{ vars.PUBLIC_HOST }}
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Azure with OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy immutable revision to VM
+        shell: bash
+        run: |
+          deployment_output="$(
+            az vm run-command invoke \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ vars.AZURE_VM_NAME }}" \
+              --command-id RunShellScript \
+              --scripts @infra/deploy/deploy.sh \
+              --parameters "$GITHUB_SHA" "$GITHUB_REPOSITORY" \
+              --query "value[0].message" \
+              --output tsv
+          )"
+          printf '%s\n' "$deployment_output"
