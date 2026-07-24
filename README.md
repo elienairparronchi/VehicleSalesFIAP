@@ -6,6 +6,8 @@ O sistema permite cadastrar veiculos para venda, editar veiculos disponiveis, li
 
 Repositorio: https://github.com/elienairparronchi/VehicleSalesFIAP
 
+Vídeo: 
+
 ## Requisitos Atendidos
 
 | Requisito | Implementacao |
