@@ -12,7 +12,7 @@ x-api-environment: &api-environment
 
 services:
   caddy:
-    image: caddy:2.10.2-alpine
+    image: caddy:2.11.4-alpine
     environment:
       PUBLIC_HOST: ${PUBLIC_HOST:?PUBLIC_HOST is required}
     ports:
