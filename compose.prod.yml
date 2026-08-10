@@ -129,7 +129,7 @@ services:
     restart: unless-stopped
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.0
+    image: quay.io/keycloak/keycloak:26.7.1
     command: start --import-realm
     environment:
       KC_DB: postgres
