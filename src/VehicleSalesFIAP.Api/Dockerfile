@@ -19,7 +19,7 @@ RUN dotnet publish "src/VehicleSalesFIAP.Api/VehicleSalesFIAP.Api.csproj" \
     --output /app/publish \
     --no-restore
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.10 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.13 AS final
 WORKDIR /app
 
 ENV ASPNETCORE_URLS=http://+:8080
