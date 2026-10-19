@@ -26,7 +26,7 @@ RUN dotnet build "src/VehicleSalesFIAP.Api/VehicleSalesFIAP.Api.csproj" \
       --no-build \
       --output /migrations/efbundle
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.10 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.13 AS final
 WORKDIR /migrations
 
 COPY --from=build /migrations/efbundle ./efbundle
